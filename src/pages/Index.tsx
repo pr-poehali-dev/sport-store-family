@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';  
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Separator } from '@/components/ui/separator';
 import Icon from '@/components/ui/icon';
 
 interface Product {
@@ -19,6 +22,13 @@ interface Product {
   sizes: string[];
   isNew?: boolean;
   discount?: number;
+  description?: string;
+}
+
+interface CartItem {
+  product: Product;
+  quantity: number;
+  selectedSize: string;
 }
 
 const sampleProducts: Product[] = [
@@ -33,7 +43,8 @@ const sampleProducts: Product[] = [
     gender: 'Унисекс',
     sport: 'Бег',
     sizes: ['36', '37', '38', '39', '40', '41', '42', '43'],
-    discount: 31
+    discount: 31,
+    description: 'Высокотехнологичные кроссовки с амортизацией для профессионального бега. Легкие, дышащие, с улучшенной поддержкой стопы.'
   },
   {
     id: 2,
@@ -45,7 +56,8 @@ const sampleProducts: Product[] = [
     gender: 'Унисекс',
     sport: 'Баскетбол',
     sizes: ['Размер 5'],
-    isNew: true
+    isNew: true,
+    description: 'Качественный баскетбольный мяч для детей. Отличное сцепление, долговечный материал, подходит для игры в зале и на улице.'
   },
   {
     id: 3,
@@ -56,7 +68,8 @@ const sampleProducts: Product[] = [
     age: 'Взрослые',
     gender: 'Женский',
     sport: 'Фитнес',
-    sizes: ['XS', 'S', 'M', 'L', 'XL']
+    sizes: ['XS', 'S', 'M', 'L', 'XL'],
+    description: 'Удобная и стильная спортивная форма для женщин. Изготовлена из дышащих материалов, обеспечивает свободу движений во время тренировок.'
   },
   {
     id: 4,
@@ -67,7 +80,8 @@ const sampleProducts: Product[] = [
     age: 'Взрослые',
     gender: 'Унисекс',
     sport: 'Фитнес',
-    sizes: ['2 кг']
+    sizes: ['2 кг'],
+    description: 'Компактные гантели для домашних тренировок. Удобная рукоятка с антискользящим покрытием, идеально подходят для силовых упражнений.'
   },
   {
     id: 5,
@@ -79,7 +93,8 @@ const sampleProducts: Product[] = [
     gender: 'Унисекс',
     sport: 'Плавание',
     sizes: ['Универсальный'],
-    isNew: true
+    isNew: true,
+    description: 'Яркие и удобные плавательные очки для детей. Защита от UV-лучей, регулируемый ремешок, не давят на переносицу.'
   },
   {
     id: 6,
@@ -92,7 +107,8 @@ const sampleProducts: Product[] = [
     gender: 'Мужской',
     sport: 'Фитнес',
     sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-    discount: 27
+    discount: 27,
+    description: 'Технологичная мужская футболка для интенсивных тренировок. Отводит влагу, быстро сохнет, не сковывает движения.'
   }
 ];
 
@@ -104,6 +120,10 @@ export default function Index() {
     sport: '',
     category: ''
   });
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [animatedElements, setAnimatedElements] = useState<Set<string>>(new Set());
 
   const filterProducts = (newFilters: typeof filters) => {
     let filtered = sampleProducts;
@@ -135,6 +155,67 @@ export default function Index() {
     setFilteredProducts(sampleProducts);
   };
 
+  const addToCart = (product: Product, selectedSize: string) => {
+    const existingItem = cart.find(item => 
+      item.product.id === product.id && item.selectedSize === selectedSize
+    );
+
+    if (existingItem) {
+      setCart(cart.map(item =>
+        item.product.id === product.id && item.selectedSize === selectedSize
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ));
+    } else {
+      setCart([...cart, { product, quantity: 1, selectedSize }]);
+    }
+  };
+
+  const removeFromCart = (productId: number, selectedSize: string) => {
+    setCart(cart.filter(item => 
+      !(item.product.id === productId && item.selectedSize === selectedSize)
+    ));
+  };
+
+  const updateCartQuantity = (productId: number, selectedSize: string, quantity: number) => {
+    if (quantity <= 0) {
+      removeFromCart(productId, selectedSize);
+      return;
+    }
+    
+    setCart(cart.map(item =>
+      item.product.id === productId && item.selectedSize === selectedSize
+        ? { ...item, quantity }
+        : item
+    ));
+  };
+
+  const getTotalPrice = () => {
+    return cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  };
+
+  const getTotalItems = () => {
+    return cart.reduce((sum, item) => sum + item.quantity, 0);
+  };
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setAnimatedElements(prev => new Set(prev).add(entry.target.id));
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
+    );
+
+    const elements = document.querySelectorAll('[data-animate]');
+    elements.forEach(el => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50">
       {/* Header */}
@@ -158,10 +239,92 @@ export default function Index() {
               <Button variant="ghost" size="sm">
                 <Icon name="Search" size={20} />
               </Button>
-              <Button variant="ghost" size="sm" className="relative">
-                <Icon name="ShoppingCart" size={20} />
-                <Badge className="absolute -top-2 -right-2 bg-sport-orange text-white text-xs">3</Badge>
-              </Button>
+              <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="sm" className="relative">
+                    <Icon name="ShoppingCart" size={20} />
+                    {getTotalItems() > 0 && (
+                      <Badge className="absolute -top-2 -right-2 bg-sport-orange text-white text-xs">
+                        {getTotalItems()}
+                      </Badge>
+                    )}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="w-full sm:max-w-lg">
+                  <SheetHeader>
+                    <SheetTitle className="flex items-center gap-2">
+                      <Icon name="ShoppingCart" size={24} />
+                      Корзина ({getTotalItems()})
+                    </SheetTitle>
+                  </SheetHeader>
+                  
+                  <div className="flex flex-col h-full">
+                    <div className="flex-1 overflow-y-auto py-4">
+                      {cart.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Icon name="ShoppingCart" size={48} className="mx-auto text-gray-400 mb-4" />
+                          <p className="text-gray-500">Корзина пуста</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {cart.map(item => (
+                            <div key={`${item.product.id}-${item.selectedSize}`} className="flex items-center gap-3 p-3 border rounded-lg">
+                              <img 
+                                src={item.product.image} 
+                                alt={item.product.name}
+                                className="w-16 h-16 object-cover rounded"
+                              />
+                              <div className="flex-1">
+                                <h4 className="font-medium text-sm line-clamp-2">{item.product.name}</h4>
+                                <p className="text-xs text-gray-500">Размер: {item.selectedSize}</p>
+                                <p className="font-bold text-sport-orange">{item.product.price.toLocaleString()} ₽</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => updateCartQuantity(item.product.id, item.selectedSize, item.quantity - 1)}
+                                >
+                                  <Icon name="Minus" size={12} />
+                                </Button>
+                                <span className="w-8 text-center">{item.quantity}</span>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => updateCartQuantity(item.product.id, item.selectedSize, item.quantity + 1)}
+                                >
+                                  <Icon name="Plus" size={12} />
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost"
+                                  onClick={() => removeFromCart(item.product.id, item.selectedSize)}
+                                >
+                                  <Icon name="Trash2" size={12} className="text-red-500" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {cart.length > 0 && (
+                      <div className="border-t pt-4">
+                        <div className="flex justify-between items-center mb-4">
+                          <span className="text-lg font-semibold">Итого:</span>
+                          <span className="text-xl font-bold text-sport-orange">
+                            {getTotalPrice().toLocaleString()} ₽
+                          </span>
+                        </div>
+                        <Button className="w-full bg-sport-orange hover:bg-sport-orange/90 text-white">
+                          Оформить заказ
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </div>
@@ -203,9 +366,28 @@ export default function Index() {
       {/* Family Categories */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
-          <h3 className="text-3xl font-bold text-center mb-12">Спорт для каждого</h3>
+          <h3 
+            id="categories-title"
+            data-animate
+            className={`text-3xl font-bold text-center mb-12 transition-all duration-700 ${
+              animatedElements.has('categories-title') 
+                ? 'translate-y-0 opacity-100' 
+                : 'translate-y-8 opacity-0'
+            }`}
+          >
+            Спорт для каждого
+          </h3>
           <div className="grid md:grid-cols-3 gap-8">
-            <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-2">
+            <Card 
+              id="category-kids"
+              data-animate
+              className={`group hover:shadow-lg transition-all duration-500 hover:-translate-y-2 ${
+                animatedElements.has('category-kids') 
+                  ? 'translate-y-0 opacity-100' 
+                  : 'translate-y-8 opacity-0'
+              }`}
+              style={{ transitionDelay: '100ms' }}
+            >
               <CardHeader className="text-center">
                 <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-sport-orange to-sport-yellow rounded-full flex items-center justify-center">
                   <Icon name="Baby" size={32} className="text-white" />
@@ -217,7 +399,16 @@ export default function Index() {
               </CardContent>
             </Card>
 
-            <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-2">
+            <Card 
+              id="category-adults"
+              data-animate
+              className={`group hover:shadow-lg transition-all duration-500 hover:-translate-y-2 ${
+                animatedElements.has('category-adults') 
+                  ? 'translate-y-0 opacity-100' 
+                  : 'translate-y-8 opacity-0'
+              }`}
+              style={{ transitionDelay: '200ms' }}
+            >
               <CardHeader className="text-center">
                 <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-sport-blue to-energy-purple rounded-full flex items-center justify-center">
                   <Icon name="Users" size={32} className="text-white" />
@@ -229,7 +420,16 @@ export default function Index() {
               </CardContent>
             </Card>
 
-            <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-2">
+            <Card 
+              id="category-family"
+              data-animate
+              className={`group hover:shadow-lg transition-all duration-500 hover:-translate-y-2 ${
+                animatedElements.has('category-family') 
+                  ? 'translate-y-0 opacity-100' 
+                  : 'translate-y-8 opacity-0'
+              }`}
+              style={{ transitionDelay: '300ms' }}
+            >
               <CardHeader className="text-center">
                 <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-sport-yellow to-sport-orange rounded-full flex items-center justify-center">
                   <Icon name="Heart" size={32} className="text-white" />
@@ -324,47 +524,142 @@ export default function Index() {
 
           {/* Products Grid */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-              <Card key={product.id} className="group hover:shadow-lg transition-all duration-300 overflow-hidden">
-                <div className="relative">
-                  <img 
-                    src={product.image} 
-                    alt={product.name}
-                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  {product.isNew && (
-                    <Badge className="absolute top-2 left-2 bg-sport-yellow text-black">Новинка</Badge>
-                  )}
-                  {product.discount && (
-                    <Badge className="absolute top-2 right-2 bg-sport-orange text-white">-{product.discount}%</Badge>
-                  )}
-                </div>
-                
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg font-semibold line-clamp-2 group-hover:text-sport-orange transition-colors">
-                    {product.name}
-                  </CardTitle>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    <Badge variant="secondary" className="text-xs">{product.category}</Badge>
-                    <Badge variant="secondary" className="text-xs">{product.sport}</Badge>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="pb-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-2xl font-bold text-sport-orange">{product.price.toLocaleString()} ₽</span>
-                    {product.originalPrice && (
-                      <span className="text-sm text-gray-500 line-through">{product.originalPrice.toLocaleString()} ₽</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Размеры: {product.sizes.slice(0, 3).join(', ')}
-                    {product.sizes.length > 3 && '...'}
-                  </p>
-                </CardContent>
+            {filteredProducts.map((product, index) => (
+              <Card 
+                key={product.id} 
+                id={`product-${product.id}`}
+                data-animate
+                className={`group hover:shadow-lg transition-all duration-300 overflow-hidden transform ${
+                  animatedElements.has(`product-${product.id}`) 
+                    ? 'translate-y-0 opacity-100' 
+                    : 'translate-y-8 opacity-0'
+                }`}
+                style={{ 
+                  transitionDelay: `${index * 100}ms`,
+                  animationDelay: `${index * 100}ms`
+                }}
+              >
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <div className="cursor-pointer">
+                      <div className="relative">
+                        <img 
+                          src={product.image} 
+                          alt={product.name}
+                          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        {product.isNew && (
+                          <Badge className="absolute top-2 left-2 bg-sport-yellow text-black">Новинка</Badge>
+                        )}
+                        {product.discount && (
+                          <Badge className="absolute top-2 right-2 bg-sport-orange text-white">-{product.discount}%</Badge>
+                        )}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center">
+                          <Icon name="Eye" size={24} className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        </div>
+                      </div>
+                      
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg font-semibold line-clamp-2 group-hover:text-sport-orange transition-colors">
+                          {product.name}
+                        </CardTitle>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          <Badge variant="secondary" className="text-xs">{product.category}</Badge>
+                          <Badge variant="secondary" className="text-xs">{product.sport}</Badge>
+                        </div>
+                      </CardHeader>
+                      
+                      <CardContent className="pb-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-2xl font-bold text-sport-orange">{product.price.toLocaleString()} ₽</span>
+                          {product.originalPrice && (
+                            <span className="text-sm text-gray-500 line-through">{product.originalPrice.toLocaleString()} ₽</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          Размеры: {product.sizes.slice(0, 3).join(', ')}
+                          {product.sizes.length > 3 && '...'}
+                        </p>
+                      </CardContent>
+                    </div>
+                  </DialogTrigger>
+                  
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl">{product.name}</DialogTitle>
+                    </DialogHeader>
+                    
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="relative">
+                        <img 
+                          src={product.image} 
+                          alt={product.name}
+                          className="w-full rounded-lg"
+                        />
+                        {product.isNew && (
+                          <Badge className="absolute top-2 left-2 bg-sport-yellow text-black">Новинка</Badge>
+                        )}
+                        {product.discount && (
+                          <Badge className="absolute top-2 right-2 bg-sport-orange text-white">-{product.discount}%</Badge>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="secondary">{product.category}</Badge>
+                          <Badge variant="secondary">{product.sport}</Badge>
+                          <Badge variant="secondary">{product.age}</Badge>
+                          <Badge variant="secondary">{product.gender}</Badge>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3">
+                            <span className="text-3xl font-bold text-sport-orange">{product.price.toLocaleString()} ₽</span>
+                            {product.originalPrice && (
+                              <span className="text-lg text-gray-500 line-through">{product.originalPrice.toLocaleString()} ₽</span>
+                            )}
+                          </div>
+                          {product.discount && (
+                            <p className="text-sm text-green-600 font-medium">Экономия: {(product.originalPrice! - product.price).toLocaleString()} ₽</p>
+                          )}
+                        </div>
+                        
+                        <p className="text-gray-600 leading-relaxed">
+                          {product.description}
+                        </p>
+                        
+                        <div className="space-y-3">
+                          <label className="text-sm font-medium">Выберите размер:</label>
+                          <div className="flex flex-wrap gap-2">
+                            {product.sizes.map(size => (
+                              <Button
+                                key={size}
+                                variant="outline"
+                                size="sm"
+                                className="hover:bg-sport-orange hover:text-white hover:border-sport-orange"
+                                onClick={() => {
+                                  addToCart(product, size);
+                                  setIsCartOpen(true);
+                                }}
+                              >
+                                {size}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
                 
                 <CardFooter className="pt-2">
-                  <Button className="w-full bg-sport-blue hover:bg-sport-blue/90 text-white">
+                  <Button 
+                    className="w-full bg-sport-blue hover:bg-sport-blue/90 text-white"
+                    onClick={() => {
+                      addToCart(product, product.sizes[0]);
+                      setIsCartOpen(true);
+                    }}
+                  >
                     <Icon name="ShoppingCart" size={16} className="mr-2" />
                     В корзину
                   </Button>
