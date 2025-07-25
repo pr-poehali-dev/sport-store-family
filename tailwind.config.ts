@@ -32,6 +32,10 @@ export default {
 					DEFAULT: 'hsl(var(--secondary))',
 					foreground: 'hsl(var(--secondary-foreground))'
 				},
+				'sport-orange': '#FF6B35',
+				'sport-blue': '#4285F4',
+				'sport-yellow': '#FFC107',
+				'energy-purple': '#8B5CF6',
 				destructive: {
 					DEFAULT: 'hsl(var(--destructive))',
 					foreground: 'hsl(var(--destructive-foreground))'
